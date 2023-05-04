@@ -4,6 +4,23 @@ cmake_minimum_required(VERSION 3.0)
 project(openFPGALoader VERSION "0.10.0" LANGUAGES CXX)
 add_definitions(-DVERSION=\"v${PROJECT_VERSION}\")
 
+# Enable all vendors by default
+if (NOT DEFINED ENABLE_VENDORS_DEFAULT)
+	set(ENABLE_VENDORS_DEFAULT ON)
+	message(STATUS "")
+	message(STATUS "All vendors drivers will enabled by default.")
+	message(STATUS "Use -DENABLE_VENDORS_DEFAULT=OFF to disable vendors by default.")
+endif()
+
+message(${ENABLE_VENDORS_DEFAULT})
+option(ENABLE_ALTERA "Enable altera FPGA support" ${ENABLE_VENDORS_DEFAULT})
+option(ENABLE_ANLOGIC "Enable anlogic FPGA support" ${ENABLE_VENDORS_DEFAULT})
+option(ENABLE_COLOGNECHIP "Enable cologneChip FPGA support" ${ENABLE_VENDORS_DEFAULT})
+OPTION(ENABLE_EFINIX "Enable efinix FPGA support" ${ENABLE_VENDORS_DEFAULT})
+option(ENABLE_GOWIN "Enable gowin FPGA support" ${ENABLE_VENDORS_DEFAULT})
+option(ENABLE_LATTICE "Enable lattice FPGA support" ${ENABLE_VENDORS_DEFAULT})
+option(ENABLE_XILINX "Enable xilinx FPGA support" ${ENABLE_VENDORS_DEFAULT})
+
 option(ENABLE_OPTIM "Enable build with -O3 optimization level" ON)
 option(BUILD_STATIC "Whether or not to build with static libraries" OFF)
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
@@ -88,20 +105,15 @@ if (USE_PKGCONFIG)
 endif()
 
 set(OPENFPGALOADER_SOURCE
-	src/anlogic.cpp
-	src/anlogicBitParser.cpp
 	src/anlogicCable.cpp
 	src/ch552_jtag.cpp
 	src/common.cpp
 	src/dfu.cpp
 	src/dfuFileParser.cpp
 	src/dirtyJtag.cpp
-	src/efinix.cpp
-	src/efinixHexParser.cpp
 	src/fx2_ll.cpp
 	src/ice40.cpp
 	src/ihexParser.cpp
-	src/pofParser.cpp
 	src/rawParser.cpp
 	src/spiFlash.cpp
 	src/spiInterface.cpp
@@ -109,7 +121,6 @@ set(OPENFPGALOADER_SOURCE
 	src/epcq.cpp
 	src/svf_jtag.cpp
 	src/jedParser.cpp
-	src/feaparser.cpp
 	src/display.cpp
 	src/jtag.cpp
 	src/ftdiJtagBitbang.cpp
@@ -117,28 +128,13 @@ set(OPENFPGALOADER_SOURCE
 	src/configBitstreamParser.cpp
 	src/ftdipp_mpsse.cpp
 	src/main.cpp
-	src/latticeBitParser.cpp
 	src/libusb_ll.cpp
-	src/gowin.cpp
 	src/device.cpp
 	src/jlink.cpp
-	src/lattice.cpp
 	src/progressBar.cpp
-	src/fsparser.cpp
-	src/mcsParser.cpp
 	src/ftdispi.cpp
-	src/altera.cpp
-	src/bitparser.cpp
-	src/xilinx.cpp
-	src/xilinxMapParser.cpp
-	src/colognechip.cpp
-	src/colognechipCfgParser.cpp
 )
-
 set(OPENFPGALOADER_HEADERS
-	src/altera.hpp
-	src/anlogic.hpp
-	src/anlogicBitParser.hpp
 	src/anlogicCable.hpp
 	src/ch552_jtag.hpp
 	src/common.hpp
@@ -146,29 +142,22 @@ set(OPENFPGALOADER_HEADERS
 	src/dfu.hpp
 	src/dfuFileParser.hpp
 	src/dirtyJtag.hpp
-	src/efinix.hpp
-	src/efinixHexParser.hpp
 	src/fx2_ll.hpp
 	src/ice40.hpp
 	src/ihexParser.hpp
-	src/pofParser.hpp
 	src/progressBar.hpp
 	src/rawParser.hpp
 	src/usbBlaster.hpp
-	src/bitparser.hpp
 	src/ftdiJtagBitbang.hpp
 	src/ftdiJtagMPSSE.hpp
 	src/jlink.hpp
 	src/jtag.hpp
 	src/jtagInterface.hpp
 	src/libusb_ll.hpp
-	src/fsparser.hpp
 	src/part.hpp
 	src/board.hpp
 	src/jedParser.hpp
-	src/feaparser.hpp
 	src/display.hpp
-	src/mcsParser.hpp
 	src/ftdipp_mpsse.hpp
 	src/spiFlash.hpp
 	src/spiFlashdb.hpp
@@ -177,15 +166,8 @@ set(OPENFPGALOADER_HEADERS
 	src/svf_jtag.hpp
 	src/configBitstreamParser.hpp
 	src/device.hpp
-	src/gowin.hpp
 	src/cable.hpp
 	src/ftdispi.hpp
-	src/lattice.hpp
-	src/latticeBitParser.hpp
-	src/xilinx.hpp
-	src/xilinxMapParser.hpp
-	src/colognechip.hpp
-	src/colognechipCfgParser.hpp
 )
 
 link_directories(
@@ -316,6 +298,77 @@ list(GET VERSION_LIST 1 LIBFTDI_VERSION_MINOR)
 math(EXPR FTDI_VAL "${LIBFTDI_VERSION_MAJOR} * 100 + ${LIBFTDI_VERSION_MINOR}")
 
 add_definitions(-DFTDI_VERSION=${FTDI_VAL})
+
+if (ENABLE_ALTERA)
+	add_definitions(-DENABLE_ALTERA=1)
+	target_sources(openFPGALoader PRIVATE src/altera.cpp src/pofParser.cpp)
+	list (APPEND OPENFPGALOADER_HEADERS src/altera.hpp src/pofParser.hpp)
+	message("altera support enabled")
+else()
+	message("altera support disabled")
+endif(ENABLE_ALTERA)
+
+if (ENABLE_ANLOGIC)
+	add_definitions(-DENABLE_ANLOGIC=1)
+	target_sources(openFPGALoader PRIVATE src/anlogic.cpp src/anlogicBitParser.cpp)
+	list (APPEND OPENFPGALOADER_HEADERS src/anlogic.hpp src/anlogicBitParser.hpp)
+	message("anlogic support enabled")
+else()
+	message("anlogic support disabled")
+endif(ENABLE_ANLOGIC)
+
+if (ENABLE_COLOGNECHIP)
+	add_definitions(-DENABLE_COLOGNECHIP=1)
+	target_sources(openFPGALoader PRIVATE src/colognechip.cpp src/colognechipCfgParser.cpp)
+	list (APPEND OPENFPGALOADER_HEADERS src/colognechip.hpp src/colognechipCfgParser.hpp)
+	message("colognechip support enabled")
+else()
+	message("colognechip support disabled")
+endif(ENABLE_COLOGNECHIP)
+
+if (ENABLE_EFINIX)
+	add_definitions(-DENABLE_EFINIX=1)
+	target_sources(openFPGALoader PRIVATE src/efinix.cpp src/efinixHexParser.cpp)
+	list (APPEND OPENFPGALOADER_HEADERS src/efinix.hpp src/efinixHexParser.hpp)
+	message("efinix support enabled")
+else()
+	message("efinix support disabled")
+endif(ENABLE_EFINIX)
+
+if (ENABLE_GOWIN)
+	add_definitions(-DENABLE_GOWIN=1)
+	target_sources(openFPGALoader PRIVATE src/gowin.cpp src/fsparser.cpp)
+	list (APPEND OPENFPGALOADER_HEADERS src/gowin.hpp src/fsparser.hpp)
+	message("gowin support enabled")
+else()
+	message("gowin support disabled")
+endif(ENABLE_GOWIN)
+
+if (ENABLE_LATTICE)
+	add_definitions(-DENABLE_LATTICE=1)
+	target_sources(openFPGALoader PRIVATE src/lattice.cpp
+		src/feaparser.cpp src/latticeBitParser.cpp
+	)
+	list (APPEND OPENFPGALOADER_HEADERS src/lattice.hpp
+		src/feaparser.hpp src/latticeBitParser.hpp
+	)
+	message("lattice support enabled")
+else()
+	message("lattice support disabled")
+endif(ENABLE_LATTICE)
+
+if (ENABLE_XILINX)
+	add_definitions(-DENABLE_XILINX=1)
+	target_sources(openFPGALoader PRIVATE src/xilinx.cpp src/xilinxMapParser.cpp
+		src/mcsParser.cpp src/bitparser.cpp
+	)
+	list (APPEND OPENFPGALOADER_HEADERS src/xilinx.hpp src/xilinxMapParser.hpp
+		src/mcsParser.hpp src/bitparser.hpp
+	)
+	message("xilinx support enabled")
+else()
+	message("xilinx support disabled")
+endif(ENABLE_XILINX)
 
 install(TARGETS openFPGALoader DESTINATION bin)
 

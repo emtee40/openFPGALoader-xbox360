@@ -13,26 +13,40 @@
 #include <sstream>
 #include <vector>
 
+#ifdef ENABLE_ALTERA
 #include "altera.hpp"
+#endif
+#ifdef ENABLE_ANLOGIC
 #include "anlogic.hpp"
+#endif
 #include "board.hpp"
 #include "cable.hpp"
+#ifdef ENABLE_COLOGNECHIP
 #include "colognechip.hpp"
+#endif
 #include "cxxopts.hpp"
 #include "device.hpp"
 #include "dfu.hpp"
 #include "display.hpp"
+#ifdef ENABLE_EFINIX
 #include "efinix.hpp"
+#endif
 #include "ftdispi.hpp"
+#ifdef ENABLE_GOWIN
 #include "gowin.hpp"
+#endif
 #include "ice40.hpp"
+#ifdef ENABLE_LATTICE
 #include "lattice.hpp"
+#endif
 #include "libusb_ll.hpp"
 #include "jtag.hpp"
 #include "part.hpp"
 #include "spiFlash.hpp"
 #include "rawParser.hpp"
+#ifdef ENABLE_XILINX
 #include "xilinx.hpp"
+#endif
 #include "svf_jtag.hpp"
 #ifdef ENABLE_XVC
 #include "xvc_server.hpp"
@@ -265,19 +279,29 @@ int main(int argc, char **argv)
 		int spi_ret = EXIT_SUCCESS;
 
 		if (board && board->manufacturer != "none") {
-			Device *target;
+			Device *target = NULL;
 			if (board->manufacturer == "efinix") {
+#ifdef ENABLE_EFINIX
 				target = new Efinix(spi, args.bit_file, args.file_type,
 					board->reset_pin, board->done_pin, board->oe_pin,
 					args.verify, args.verbose);
+#else
+				printError("Error: Efinix support disable");
+				return EXIT_FAILURE;
+#endif
 			} else if (board->manufacturer == "lattice") {
 				target = new Ice40(spi, args.bit_file, args.file_type,
 					args.prg_type,
 					board->reset_pin, board->done_pin, args.verify, args.verbose);
 			} else if (board->manufacturer == "colognechip") {
+#ifdef ENABLE_COLOGNECHIP
 				target = new CologneChip(spi, args.bit_file, args.file_type, args.prg_type,
 					board->reset_pin, board->done_pin, DBUS6, board->oe_pin,
 					args.verify, args.verbose);
+#else
+				printError("Error: CologneChip support disable");
+				return EXIT_FAILURE;
+#endif
 			}
 			if (args.prg_type == Device::RD_FLASH) {
 				if (args.file_size == 0) {
@@ -541,39 +565,69 @@ int main(int argc, char **argv)
 	string fab = fpga_list[idcode].manufacturer;
 
 
-	Device *fpga;
+	Device *fpga = NULL;
 	try {
 		if (fab == "xilinx") {
+#ifdef ENABLE_XILINX
 			fpga = new Xilinx(jtag, args.bit_file, args.secondary_bit_file,
 				args.file_type, args.prg_type, args.fpga_part, args.bridge_path,
 				args.target_flash, args.verify, args.verbose, args.skip_load_bridge, args.skip_reset);
+#else
+			printError("Error: Xilinx support disable");
+#endif
 		} else if (fab == "altera") {
+#ifdef ENABLE_ALTERA
 			fpga = new Altera(jtag, args.bit_file, args.file_type,
 				args.prg_type, args.fpga_part, args.bridge_path, args.verify,
 				args.verbose, args.skip_load_bridge, args.skip_reset);
+#else
+			printError("Error: Altera support disable");
+#endif
 		} else if (fab == "anlogic") {
+#ifdef ENABLE_ANLOGIC
 			fpga = new Anlogic(jtag, args.bit_file, args.file_type,
 				args.prg_type, args.verify, args.verbose);
+#else
+			printError("Error: Anlogic support disable");
+#endif
 		} else if (fab == "efinix") {
+#ifdef ENABLE_EFINIX
 			fpga = new Efinix(jtag, args.bit_file, args.file_type,
 				args.prg_type, args.board, args.fpga_part, args.bridge_path,
 				args.verify, args.verbose);
+#else
+			printError("Error: Efinix support disable");
+#endif
 		} else if (fab == "Gowin") {
+#ifdef ENABLE_GOWIN
 			fpga = new Gowin(jtag, args.bit_file, args.file_type, args.mcufw,
 				args.prg_type, args.external_flash, args.verify, args.verbose);
+#else
+			printError("Error: Gowin support disable");
+#endif
 		} else if (fab == "lattice") {
+#ifdef ENABLE_LATTICE
 			fpga = new Lattice(jtag, args.bit_file, args.file_type,
 				args.prg_type, args.flash_sector, args.verify, args.verbose);
+#else
+			printError("Error: Lattice support disable");
+#endif
 		} else if (fab == "colognechip") {
+#ifdef ENABLE_COLOGNECHIP
 			fpga = new CologneChip(jtag, args.bit_file, args.file_type,
 				args.prg_type, args.board, args.cable, args.verify, args.verbose);
+#else
+			printError("Error: CologneChip support disable");
+#endif
 		} else {
 			printError("Error: manufacturer " + fab + " not supported");
-			delete(jtag);
-			return EXIT_FAILURE;
 		}
 	} catch (std::exception &e) {
 		printError("Error: Failed to claim FPGA device: " + string(e.what()));
+		fpga = NULL;
+	}
+
+	if (!fpga) {
 		delete(jtag);
 		return EXIT_FAILURE;
 	}
