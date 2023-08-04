@@ -1009,16 +1009,22 @@ void displaySupported(const struct arguments &args)
 	}
 
 	if (args.list_boards) {
-		stringstream t;
-		t << setw(25) << left << "board name" << "cable_name";
-		printSuccess(t.str());
-		for (auto b = board_list.begin(); b != board_list.end(); b++) {
-			stringstream ss;
-			target_board_t c = (*b).second;
-			ss << setw(25) << left << (*b).first << c.cable_name;
-			printInfo(ss.str());
+		for (auto &&vendor: fpga_vnd_list) {
+			stringstream t;
+			t << setw(12) << left << "IDCode" << setw(14) << "manufacturer";
+			t << setw(16) << "family" << setw(20) << "model";
+			printSuccess(t.str());
+			for (auto &&part: vendor.second) {
+				fpga_model fpga = part.second;
+				stringstream ss, idCode;
+				idCode << "0x" << hex << setw(8) << setfill('0') << part.first;
+				ss << setw(12) << left << idCode.str();
+				ss << setw(14) << fpga.manufacturer << setw(16) << fpga.family;
+				ss << setw(20) << fpga.model;
+				printInfo(ss.str());
+			}
+			cout << endl;
 		}
-		cout << endl;
 	}
 
 	if (args.list_fpga) {
