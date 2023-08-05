@@ -453,7 +453,7 @@ int main(int argc, char **argv)
 	}
 
 	/* chain detection */
-	vector<int> listDev = jtag->get_devices_list();
+	//vector<int> listDev = jtag->get_devices_list();
 	int found = listDev.size();
 	int idcode = -1, index = 0;
 
@@ -464,7 +464,7 @@ int main(int argc, char **argv)
 	 * display full chain with details
 	 */
 	if (args.verbose > 0 || args.detect) {
-		std::vector<Jtag::found_device> fd = jtag->get_devices_list2();
+		std::vector<Jtag::found_device> fd = jtag->get_devices_list();
 		for (auto f: fd) {
 			printf("\tidcode 0x%x\n\tmanufacturer %s\n\tfamily %s\n\tmodel  %s\n",
 			f.idcode,
@@ -481,7 +481,15 @@ int main(int argc, char **argv)
 
 	if (found != 0) {
 		if (args.index_chain == -1) {
-			for (int i = 0; i < found; i++) {
+			if (jtag->get_nb_targets() != 1) {
+				printError("Error: more than one FPGA found");
+				printError("Use --index-chain to force selection");
+				for (int i = 0; i < found; i++)
+					printf("0x%08x\n", listDev[i]);
+				delete(jtag);
+				return EXIT_FAILURE;
+			}
+			/*for (int i = 0; i < found; i++) {
 				if (fpga_list.find(listDev[i]) != fpga_list.end()) {
 					index = i;
 					if (idcode != -1) {
@@ -495,7 +503,7 @@ int main(int argc, char **argv)
 						idcode = listDev[i];
 					}
 				}
-			}
+			}*/
 		} else {
 			index = args.index_chain;
 			if (index > found || index < 0) {
@@ -503,8 +511,8 @@ int main(int argc, char **argv)
 				delete(jtag);
 				return EXIT_FAILURE;
 			}
-			idcode = listDev[index];
 		}
+		idcode = jtag->get_target_device_id();
 	} else {
 		printError("Error: no device found");
 		delete(jtag);

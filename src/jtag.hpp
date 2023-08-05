@@ -48,14 +48,14 @@ class Jtag {
 	 * \brief return list of devices in the chain
 	 * \return list of devices
 	 */
-	std::vector<int> get_devices_list() {return _devices_list;}
-	std::vector<found_device> get_devices_list2() {return _f_device_list;}
+	//std::vector<int> get_devices_list() {return _devices_list;}
+	std::vector<found_device> get_devices_list() {return _f_device_list;}
 
 	/*!
 	 * \brief return current selected device idcode
 	 * \return device idcode
 	 */
-	uint32_t get_target_device_id() {return _devices_list[device_index];}
+	uint32_t get_target_device_id() {return _f_device_list[device_index].idcode;}
 
 	/*!
 	 * \brief set index for targeted FPGA
@@ -145,7 +145,7 @@ class Jtag {
 	std::string _board_name;
 
 	int device_index; /*!< index for targeted FPGA */
-	std::vector<int32_t> _devices_list; /*!< ordered list of devices idcode */
+	//std::vector<int32_t> _devices_list; /*!< ordered list of devices idcode */
 	std::vector<int16_t> _irlength_list; /*!< ordered list of irlength */
 	std::vector<found_device> _f_device_list;
 };

@@ -166,7 +166,7 @@ int Jtag::detectChain(int max_dev)
 	unsigned int tmp;
 
 	/* cleanup */
-	_devices_list.clear();
+	_f_device_list.clear();
 	_irlength_list.clear();
 
 	go_test_logic_reset();
@@ -210,7 +210,7 @@ int Jtag::detectChain(int max_dev)
 	}
 	go_test_logic_reset();
 	flushTMS(true);
-	return _devices_list.size();
+	return _f_device_list.size();
 }
 
 bool Jtag::search_and_insert_device_with_idcode(uint32_t idcode)
@@ -269,7 +269,7 @@ bool Jtag::insert_first(uint32_t device_id, bool is_misc, uint16_t irlength, dev
 {
 	found_device dev = {device_id, irlength, is_misc, device};
 	_f_device_list.insert(_f_device_list.begin(), dev);
-	_devices_list.insert(_devices_list.begin(), device_id);
+	//_devices_list.insert(_devices_list.begin(), device_id);
 	_irlength_list.insert(_irlength_list.begin(), irlength);
 
 	return true;
@@ -277,7 +277,7 @@ bool Jtag::insert_first(uint32_t device_id, bool is_misc, uint16_t irlength, dev
 
 uint16_t Jtag::device_select(uint16_t index)
 {
-	if (index > (uint16_t) _devices_list.size())
+	if (index > (uint16_t) _f_device_list.size())
 		return -1;
 	device_index = index;
 	return device_index;
@@ -363,7 +363,7 @@ int Jtag::shiftDR(unsigned char *tdi, unsigned char *tdo, int drlen, int end_sta
 		/* get number of devices, in the JTAG chain,
 		 * before the selected one
 		 */
-		int bits_before = _devices_list.size() - device_index - 1;
+		int bits_before = _f_device_list.size() - device_index - 1;
 
 		/* if not 0 send enough bits
 		 */
@@ -432,7 +432,7 @@ int Jtag::shiftIR(unsigned char *tdi, unsigned char *tdo, int irlen, int end_sta
 		 * before targeted and irlength of each one
 		 */
 		int bypass_before = 0;
-		for (unsigned int i = device_index + 1; i < _devices_list.size(); i++)
+		for (unsigned int i = device_index + 1; i < _f_device_list.size(); i++)
 			bypass_before += _irlength_list[i];
 
 		/* if > 0 send bits */
