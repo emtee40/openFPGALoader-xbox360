@@ -464,22 +464,14 @@ int main(int argc, char **argv)
 	 * display full chain with details
 	 */
 	if (args.verbose > 0 || args.detect) {
-		for (int i = 0; i < found; i++) {
-			int t = listDev[i];
-			printf("index %d:\n", i);
-			if (fpga_list.find(t) != fpga_list.end()) {
-				printf("\tidcode 0x%x\n\tmanufacturer %s\n\tfamily %s\n\tmodel  %s\n",
-				t,
-				fpga_list[t].manufacturer.c_str(),
-				fpga_list[t].family.c_str(),
-				fpga_list[t].model.c_str());
-				printf("\tirlength %d\n", fpga_list[t].irlength);
-			} else if (misc_dev_list.find(t) != misc_dev_list.end()) {
-				printf("\tidcode   0x%x\n\ttype     %s\n\tirlength %d\n",
-				t,
-				misc_dev_list[t].name.c_str(),
-				misc_dev_list[t].irlength);
-			}
+		std::vector<Jtag::found_device> fd = jtag->get_devices_list2();
+		for (auto f: fd) {
+			printf("\tidcode 0x%x\n\tmanufacturer %s\n\tfamily %s\n\tmodel  %s\n",
+			f.idcode,
+			f.model->manufacturer.c_str(),
+			f.model->family.c_str(),
+			f.model->model.c_str());
+			printf("\tirlength %d\n", f.irlength);
 		}
 		if (args.detect == true) {
 			delete jtag;
@@ -1009,13 +1001,25 @@ void displaySupported(const struct arguments &args)
 	}
 
 	if (args.list_boards) {
+		stringstream t;
+		t << setw(25) << left << "board name" << "cable_name";
+		printSuccess(t.str());
+		for (auto b = board_list.begin(); b != board_list.end(); b++) {
+			stringstream ss;
+			target_board_t c = (*b).second;
+			ss << setw(25) << left << (*b).first << c.cable_name;
+			printInfo(ss.str());
+		}
+	}
+
+	if (args.list_fpga) {
 		for (auto &&vendor: fpga_vnd_list) {
 			stringstream t;
 			t << setw(12) << left << "IDCode" << setw(14) << "manufacturer";
 			t << setw(16) << "family" << setw(20) << "model";
 			printSuccess(t.str());
 			for (auto &&part: vendor.second) {
-				fpga_model fpga = part.second;
+				device_model fpga = part.second;
 				stringstream ss, idCode;
 				idCode << "0x" << hex << setw(8) << setfill('0') << part.first;
 				ss << setw(12) << left << idCode.str();
@@ -1025,23 +1029,6 @@ void displaySupported(const struct arguments &args)
 			}
 			cout << endl;
 		}
-	}
-
-	if (args.list_fpga) {
-		stringstream t;
-		t << setw(12) << left << "IDCode" << setw(14) << "manufacturer";
-		t << setw(16) << "family" << setw(20) << "model";
-		printSuccess(t.str());
-		for (auto b = fpga_list.begin(); b != fpga_list.end(); b++) {
-			fpga_model fpga = (*b).second;
-			stringstream ss, idCode;
-			idCode << "0x" << hex << setw(8) << setfill('0') << (*b).first;
-			ss << setw(12) << left << idCode.str();
-			ss << setw(14) << fpga.manufacturer << setw(16) << fpga.family;
-			ss << setw(20) << fpga.model;
-			printInfo(ss.str());
-		}
-		cout << endl;
 	}
 
 	if (args.scan_usb) {

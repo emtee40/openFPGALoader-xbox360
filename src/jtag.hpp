@@ -13,6 +13,7 @@
 #include "board.hpp"
 #include "cable.hpp"
 #include "jtagInterface.hpp"
+#include "part.hpp"
 
 class Jtag {
  public:
@@ -28,6 +29,13 @@ class Jtag {
 	int setClkFreq(uint32_t clkHZ) { return _jtag->setClkFreq(clkHZ);}
 	uint32_t getClkFreq() { return _jtag->getClkFreq();}
 
+	typedef struct {
+		uint32_t idcode;
+		uint16_t irlength;
+		bool is_misc;
+		device_model *model;
+	} found_device;
+
 	/*!
 	 * \brief scan JTAG chain to obtain IDCODE. Fill
 	 *        a vector with all idcode and another
@@ -41,6 +49,7 @@ class Jtag {
 	 * \return list of devices
 	 */
 	std::vector<int> get_devices_list() {return _devices_list;}
+	std::vector<found_device> get_devices_list2() {return _f_device_list;}
 
 	/*!
 	 * \brief return current selected device idcode
@@ -60,7 +69,16 @@ class Jtag {
 	 * \param[in] irlength: device irlength
 	 * \return false if fails
 	 */
-	bool insert_first(uint32_t device_id, uint16_t irlength);
+	//bool insert_first(uint32_t device_id, uint16_t irlength);
+	bool insert_first(uint32_t idcode, bool is_misc, uint16_t irlength, device_model *device);
+
+	int get_nb_targets() {
+		int nb = 0;
+		for (auto t: _f_device_list)
+			if (!t.is_misc)
+				nb++;
+		return nb;
+	}
 
 	/*!
 	 * \brief return a pointer to the transport subclass
@@ -109,6 +127,7 @@ class Jtag {
 
 	JtagInterface *_jtag;
 
+
  private:
 	/*!
 	 * \brief search in fpga_list and misc_dev_list for a device with idcode
@@ -128,5 +147,6 @@ class Jtag {
 	int device_index; /*!< index for targeted FPGA */
 	std::vector<int32_t> _devices_list; /*!< ordered list of devices idcode */
 	std::vector<int16_t> _irlength_list; /*!< ordered list of irlength */
+	std::vector<found_device> _f_device_list;
 };
 #endif

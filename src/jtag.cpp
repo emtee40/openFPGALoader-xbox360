@@ -192,15 +192,7 @@ int Jtag::detectChain(int max_dev)
 		 * if IDCODE has no match: try the same with version unmasked
 		 */
 		if (tmp != 0 && tmp != 0xffffffff) {
-			bool found = false;
-			/* ckeck highest nibble to prevent confusion between Cologne Chip
-			 * GateMate and Efinix Trion T4/T8 devices
-			 */
-			if (tmp != 0x20000001)
-				found = search_and_insert_device_with_idcode(tmp & 0x0fffffff);
-			if (!found) /* if masked not found -> search for full */
-				found = search_and_insert_device_with_idcode(tmp);
-
+			bool found = search_and_insert_device_with_idcode(tmp);
 			if (!found) {
 				uint16_t mfg = IDCODE2MANUFACTURERID(tmp);
 				uint8_t part = IDCODE2PART(tmp);
@@ -223,23 +215,60 @@ int Jtag::detectChain(int max_dev)
 
 bool Jtag::search_and_insert_device_with_idcode(uint32_t idcode)
 {
-	int irlength = -1;
-	auto dev = fpga_list.find(idcode);
-	if (dev != fpga_list.end())
-		irlength = dev->second.irlength;
-	if (irlength == -1) {
-		auto misc = misc_dev_list.find(idcode);
-		if (misc != misc_dev_list.end())
-			irlength = misc->second.irlength;
-	}
-	if (irlength == -1)
-		return false;
+	std::map<std::string, std::map<uint32_t, device_model>>::iterator vnd_list;
+	device_model *fpga;
+	std::map<uint32_t, device_model>::iterator fpga2;
+	std::string manufacturer;
+	bool found = false;
 
-	return insert_first(idcode, irlength);
+	switch (idcode) {
+	case 0x20000001: // colognechip
+		manufacturer = "colognechip";
+		break;
+	case 0x01:
+		manufacturer = "efinix";
+		break;
+	default:
+		manufacturer = list_manufacturer[IDCODE2MANUFACTURERID(idcode)];
+	}
+
+	/* search entry at vendor level */
+	vnd_list = fpga_vnd_list.find(manufacturer);
+	if (vnd_list != fpga_vnd_list.end()) {
+		/* try to find direct idcode (no mask) */
+		fpga2 = vnd_list->second.find(idcode);
+		/* direct not found -> search for idcode with mask */
+		if (fpga2 == fpga_vnd_list[manufacturer].end()) {
+			idcode = idcode & 0x0FFFFFFF;
+			fpga2 = vnd_list->second.find(idcode);
+			if (fpga2 != fpga_vnd_list[manufacturer].end())
+				found = true;
+		} else {
+			found = true;
+		}
+	}
+
+	/* device found: insert has a potential target */
+	if (found) {
+		fpga = &fpga2->second;
+		insert_first(idcode, false, fpga->irlength, fpga);
+	} else { // when not found -> try for a misc device */
+		auto misc = misc_dev_list.find(idcode);
+		if (misc != misc_dev_list.end()) {
+			insert_first(idcode, true, misc->second.irlength, &misc->second);
+			found = true;
+		}
+	}
+	if (!found) {
+		printf("Error: try to insert unknown device\n");
+	}
+	return found;
 }
 
-bool Jtag::insert_first(uint32_t device_id, uint16_t irlength)
+bool Jtag::insert_first(uint32_t device_id, bool is_misc, uint16_t irlength, device_model *device)
 {
+	found_device dev = {device_id, irlength, is_misc, device};
+	_f_device_list.insert(_f_device_list.begin(), dev);
 	_devices_list.insert(_devices_list.begin(), device_id);
 	_irlength_list.insert(_irlength_list.begin(), irlength);
 

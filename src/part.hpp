@@ -15,10 +15,10 @@ typedef struct {
 	std::string family;
 	std::string model;
 	int irlength;
-} fpga_model;
+} device_model;
 
 /* Highest nibble (version) must always be set to 0 */
-static std::map <uint32_t, fpga_model> fpga_list = {
+static std::map <uint32_t, device_model> fpga_list = {
 	/**************************************************************************/
 	/*                            Anlogic                                     */
 	/**************************************************************************/
@@ -236,7 +236,7 @@ static std::map <uint32_t, fpga_model> fpga_list = {
 };
 
 /* Highest nibble (version) must always be set to 0 */
-static std::map <std::string, std::map <uint32_t, fpga_model>> fpga_vnd_list = {
+static std::map <std::string, std::map <uint32_t, device_model>> fpga_vnd_list = {
 	/**************************************************************************/
 	/*                             Altera                                     */
 	/**************************************************************************/
@@ -473,10 +473,10 @@ typedef struct {
 	int irlength;
 } misc_device;
 
-static std::map <uint32_t, misc_device> misc_dev_list = {
-	{0x4ba00477, {"ARM cortex A9",         4}},
-	{0x5ba00477, {"ARM cortex A53",        4}},
-	{0xfffffffe, {"ZynqMP dummy device",   12}},
+static std::map <uint32_t, device_model> misc_dev_list = {
+	{0x4ba00477, {"ARM",    "cortex", "A9",           4}},
+	{0x5ba00477, {"ARM",    "cortex", "A53",          4}},
+	{0xfffffffe, {"xilinx", "ZynqMP", "dummy device", 12}},
 };
 
 /* list of JTAG manufacturer ID */

@@ -308,7 +308,7 @@ bool Xilinx::zynqmp_init(const std::string &family)
 		return false;
 	}
 
-	_jtag->insert_first(0xdeadbeef, 6);
+	_jtag->insert_first(0xdeadbeef, true, 6, NULL);
 	_jtag->device_select(1);
 	_irlen = 6;
 
