@@ -453,8 +453,7 @@ int main(int argc, char **argv)
 	}
 
 	/* chain detection */
-	//vector<int> listDev = jtag->get_devices_list();
-	int found = listDev.size();
+	int found = jtag->get_chain_length();
 	int idcode = -1, index = 0;
 
 	if (args.verbose > 0)
@@ -484,26 +483,11 @@ int main(int argc, char **argv)
 			if (jtag->get_nb_targets() != 1) {
 				printError("Error: more than one FPGA found");
 				printError("Use --index-chain to force selection");
-				for (int i = 0; i < found; i++)
-					printf("0x%08x\n", listDev[i]);
+				for (auto f: jtag->get_devices_list())
+					printf("0x%08x\n", f.idcode);
 				delete(jtag);
 				return EXIT_FAILURE;
 			}
-			/*for (int i = 0; i < found; i++) {
-				if (fpga_list.find(listDev[i]) != fpga_list.end()) {
-					index = i;
-					if (idcode != -1) {
-						printError("Error: more than one FPGA found");
-						printError("Use --index-chain to force selection");
-						for (int i = 0; i < found; i++)
-							printf("0x%08x\n", listDev[i]);
-						delete(jtag);
-						return EXIT_FAILURE;
-					} else {
-						idcode = listDev[i];
-					}
-				}
-			}*/
 		} else {
 			index = args.index_chain;
 			if (index > found || index < 0) {

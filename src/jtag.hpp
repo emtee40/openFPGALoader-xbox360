@@ -72,8 +72,18 @@ class Jtag {
 	//bool insert_first(uint32_t device_id, uint16_t irlength);
 	bool insert_first(uint32_t idcode, bool is_misc, uint16_t irlength, device_model *device);
 
-	int get_nb_targets() {
-		int nb = 0;
+	/*!
+	 * \brief return hown many devices were detected (supported and misc devices)
+	 * \return device list length
+	 */
+	size_t get_chain_length() { return _f_device_list.size(); }
+
+	/*!
+	 * \brief return hown many supported devices were detected (misc devices not included)
+	 * \return device list length
+	 */
+	size_t get_nb_targets() {
+		size_t nb = 0;
 		for (auto t: _f_device_list)
 			if (!t.is_misc)
 				nb++;

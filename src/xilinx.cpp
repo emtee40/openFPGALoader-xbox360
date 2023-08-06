@@ -283,7 +283,7 @@ bool Xilinx::zynqmp_init(const std::string &family)
 	 * ARM at position 1
 	 */
 	char mess[256];
-	std::vector<int> listDev = _jtag->get_devices_list();
+	std::vector<Jtag::found_device> listDev = _jtag->get_devices_list();
 	if (listDev.size() != 2) {
 		snprintf(mess, sizeof(mess), "ZynqMP error: wrong"
 				" JTAG length: %zu instead of 2\n",
@@ -292,18 +292,18 @@ bool Xilinx::zynqmp_init(const std::string &family)
 		return false;
 	}
 
-	if (fpga_list[listDev[0]].family != "zynqmp") {
+	if (listDev[0].model && listDev[0].model->family != "zynqmp") {
 		snprintf(mess, sizeof(mess), "ZynqMP error: first device"
 				" is not the PL TAP -> 0x%08x\n",
-				listDev[0]);
+				listDev[0].idcode);
 		printError(mess);
 		return false;
 	}
 
-	if (listDev[1] != 0x5ba00477) {
+	if (listDev[1].idcode != 0x5ba00477) {
 		snprintf(mess, sizeof(mess), "ZynqMP error: second device"
 				" is not the ARM DAP cortex A53 -> 0x%08x\n",
-				listDev[1]);
+				listDev[1].idcode);
 		printError(mess);
 		return false;
 	}
