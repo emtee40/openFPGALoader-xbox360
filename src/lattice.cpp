@@ -161,8 +161,7 @@ Lattice::Lattice(Jtag *jtag, const string filename, const string &file_type,
 		}
 	}
 	/* check device family */
-	uint32_t idcode = _jtag->get_target_device_id();
-	string family = fpga_list[idcode].family;
+	string family = _jtag->get_target()->model->family;
 	if (family == "MachXO2") {
 		_fpga_family = MACHXO2_FAMILY;
 	} else if (family == "MachXO3LF") {

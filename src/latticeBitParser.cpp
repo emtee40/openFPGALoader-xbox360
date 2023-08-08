@@ -116,9 +116,7 @@ int LatticeBitParser::parse()
 		}
 		string part = getHeaderVal("Part");
 		string subpart = part.substr(0, part.find_last_of("-"));
-		for (auto && fpga : fpga_list) {
-			if (fpga.second.manufacturer != "lattice")
-				continue;
+		for (auto && fpga : fpga_list["lattice"]) {
 			string model = fpga.second.model;
 			if (subpart.compare(0, model.size(), model) == 0) {
 				_hdr["idcode"] = string(8, ' ');

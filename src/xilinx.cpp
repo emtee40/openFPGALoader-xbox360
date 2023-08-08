@@ -176,17 +176,18 @@ Xilinx::Xilinx(Jtag *jtag, const std::string &filename,
 		}
 	}
 
-	uint32_t idcode = _jtag->get_target_device_id();
-	std::string family = fpga_list[idcode].family;
-	std::string model = fpga_list[idcode].model;
-	_irlen = fpga_list[idcode].irlength;
+	Jtag::found_device *tgt_dev = _jtag->get_target();
+	uint32_t idcode = tgt_dev->idcode;
+	_family = tgt_dev->model->family;
+	_model = tgt_dev->model->model;
+	_irlen = tgt_dev->irlength;
 	_ircode_map = ircode_mapping.at("default");
 
-	if (family.substr(0, 5) == "artix") {
+	if (_family.substr(0, 5) == "artix") {
 		_fpga_family = ARTIX_FAMILY;
-	} else if (family == "spartan7") {
+	} else if (_family == "spartan7") {
 		_fpga_family = SPARTAN7_FAMILY;
-	} else if (family == "zynq") {
+	} else if (_family == "zynq") {
 		_fpga_family = ZYNQ_FAMILY;
 		if (_mode != Device::MEM_MODE) {
 			char mess[256];
@@ -195,7 +196,7 @@ Xilinx::Xilinx(Jtag *jtag, const std::string &filename,
 				"\tSPI Flash access is only available from PS side\n");
 			throw std::runtime_error(mess);
 		}
-	} else if (family.substr(0, 6) == "zynqmp") {
+	} else if (_family.substr(0, 6) == "zynqmp") {
 		if (_mode != Device::MEM_MODE) {
 			char mess[256];
 			snprintf(mess, 256, "Error: can't flash non-volatile memory for "
@@ -203,35 +204,35 @@ Xilinx::Xilinx(Jtag *jtag, const std::string &filename,
 				"\tSPI Flash access is only available from PSU side\n");
 			throw std::runtime_error(mess);
 		}
-		if (!zynqmp_init(family))
+		if (!zynqmp_init(_family))
 			throw std::runtime_error("Error with ZynqMP init");
 		_fpga_family = ZYNQMP_FAMILY;
-	} else if (family == "kintex7") {
+	} else if (_family == "kintex7") {
 		_fpga_family = KINTEX_FAMILY;
-	} else if (family == "kintexus") {
+	} else if (_family == "kintexus") {
 		_fpga_family = KINTEXUS_FAMILY;
-	} else if (family == "kintexusp") {
+	} else if (_family == "kintexusp") {
 		_fpga_family = KINTEXUSP_FAMILY;
-	} else if (family == "artixusp") {
+	} else if (_family == "artixusp") {
 		_fpga_family = ARTIXUSP_FAMILY;
-	} else if (family == "virtexusp") {
+	} else if (_family == "virtexusp") {
 		_fpga_family = VIRTEXUSP_FAMILY;
 		_ircode_map = ircode_mapping.at("virtexusp");
-	} else if (family.substr(0, 8) == "spartan3") {
+	} else if (_family.substr(0, 8) == "spartan3") {
 		_fpga_family = SPARTAN3_FAMILY;
 		if (_mode != Device::MEM_MODE) {
 			throw std::runtime_error("Error: Only load to mem is supported");
 		}
-	} else if (family == "xcf") {
+	} else if (_family == "xcf") {
 		_fpga_family = XCF_FAMILY;
 		if (_mode == Device::MEM_MODE) {
 			throw std::runtime_error("Error: Only write or read is supported");
 		}
-	} else if (family == "spartan6") {
+	} else if (_family == "spartan6") {
 		_fpga_family = SPARTAN6_FAMILY;
-	} else if (family == "xc2c") {
+	} else if (_family == "xc2c") {
 		xc2c_init(idcode);
-	} else if (family == "xc9500xl") {
+	} else if (_family == "xc9500xl") {
 		_fpga_family = XC95_FAMILY;
 		switch (idcode) {
 		case 0x09602093:
@@ -776,8 +777,7 @@ bool Xilinx::xc3s_flow_program(ConfigBitstreamParser *bit)
 
 	flow_disable();
 	uint8_t mask = 0x20; // Done bit
-	uint32_t idcode = _jtag->get_target_device_id();
-	if (fpga_list[idcode].family == "spartan3e") {
+	if (_family == "spartan3e") {
 		mask = 0x10; // ISC done dit
 	}
 	int retry = 100;
@@ -1290,10 +1290,9 @@ static constexpr uint8_t _gray_code[256] = {
 void Xilinx::xc2c_init(uint32_t idcode)
 {
 	_fpga_family = XC2C_FAMILY;
-	std::string model = fpga_list[idcode].model;
-	int underscore_pos = model.find_first_of('_', 0);
+	int underscore_pos = _model.find_first_of('_', 0);
 	snprintf(_cpld_base_name, underscore_pos,
-			"%s", model.substr(0, underscore_pos).c_str());
+			"%s", _model.substr(0, underscore_pos).c_str());
 	switch ((idcode >> 16) & 0x3f) {
 	case 0x01: /* xc2c32 */
 	case 0x11: /* xc2c32a PC44 */

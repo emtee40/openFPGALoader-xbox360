@@ -48,7 +48,6 @@ class Jtag {
 	 * \brief return list of devices in the chain
 	 * \return list of devices
 	 */
-	//std::vector<int> get_devices_list() {return _devices_list;}
 	std::vector<found_device> get_devices_list() {return _f_device_list;}
 
 	/*!
@@ -58,18 +57,23 @@ class Jtag {
 	uint32_t get_target_device_id() {return _f_device_list[device_index].idcode;}
 
 	/*!
+	 * \brief return current selected target
+	 * \return device information
+	 */
+	found_device *get_target() {return &_f_device_list[device_index];}
+
+	/*!
 	 * \brief set index for targeted FPGA
 	 * \param[in] index: index in the chain
-	 * \return -1 if index is out of bound, index otherwise
+	 * \return false if index is out of bound, true otherwise
 	 */
-	uint16_t device_select(uint16_t index);
+	bool device_select(uint16_t index);
 	/*!
 	 * \brief inject a device into list at the begin
 	 * \param[in] device_id: idcode
 	 * \param[in] irlength: device irlength
 	 * \return false if fails
 	 */
-	//bool insert_first(uint32_t device_id, uint16_t irlength);
 	bool insert_first(uint32_t idcode, bool is_misc, uint16_t irlength, device_model *device);
 
 	/*!
@@ -141,8 +145,8 @@ class Jtag {
  private:
 	/*!
 	 * \brief search in fpga_list and misc_dev_list for a device with idcode
-	 *        if found insert idcode and irlength in _devices_list and
-	 *        _irlength_list
+	 *        if found insert idcode, irlength and a pointer to entry part
+	 *        in _f_devices_list
 	 * \param[in] idcode: device idcode
 	 * \return false if not found, true otherwise
 	 */
@@ -155,8 +159,6 @@ class Jtag {
 	std::string _board_name;
 
 	int device_index; /*!< index for targeted FPGA */
-	//std::vector<int32_t> _devices_list; /*!< ordered list of devices idcode */
-	std::vector<int16_t> _irlength_list; /*!< ordered list of irlength */
-	std::vector<found_device> _f_device_list;
+	std::vector<found_device> _f_device_list; /*!< ordered list of devices present */
 };
 #endif

@@ -55,8 +55,8 @@ Efinix::Efinix(Jtag* jtag, const std::string &filename,
 
 	/* detect FPGA type (Trion or Titanium) */
 
-	const uint32_t idcode = _jtag->get_target_device_id();
-	const std::string family = fpga_list[idcode].family;
+	const Jtag::found_device* tgt_dev = _jtag->get_target();
+	const std::string family = tgt_dev->model->family;
 	if (family == "Titanium") {
 		if (_file_extension == "hex" && prg_type == Device::WR_SRAM) {
 			throw std::runtime_error("Error: loading (RAM) hex file is not "
@@ -72,7 +72,7 @@ Efinix::Efinix(Jtag* jtag, const std::string &filename,
 		throw std::runtime_error("Error: unknown family " + family);
 	}
 	/* get irlen value from model */
-	_irlen = fpga_list[idcode].irlength;
+	_irlen = tgt_dev->irlength;
 
 	/* WA: before using JTAG, device must restart with cs low
 	 *     but cs and rst for xyloni are connected to interfaceA (ie SPI)

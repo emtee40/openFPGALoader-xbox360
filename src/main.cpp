@@ -454,7 +454,7 @@ int main(int argc, char **argv)
 
 	/* chain detection */
 	int found = jtag->get_chain_length();
-	int idcode = -1, index = 0;
+	int index = 0;
 
 	if (args.verbose > 0)
 		cout << "found " << std::to_string(found) << " devices" << endl;
@@ -496,7 +496,6 @@ int main(int argc, char **argv)
 				return EXIT_FAILURE;
 			}
 		}
-		idcode = jtag->get_target_device_id();
 	} else {
 		printError("Error: no device found");
 		delete(jtag);
@@ -504,6 +503,7 @@ int main(int argc, char **argv)
 	}
 
 	jtag->device_select(index);
+	Jtag::found_device *tgt_dev = jtag->get_target();
 
 	/* detect svf file and program the device */
 	if (!args.file_type.compare("svf") ||
@@ -520,13 +520,14 @@ int main(int argc, char **argv)
     /* check if selected device is supported
 	 * mainly used in conjunction with --index-chain
 	 */
-	if (fpga_list.find(idcode) == fpga_list.end()) {
-		cerr << "Error: device " << hex << idcode << " not supported" << endl;
+	if (tgt_dev->is_misc || !tgt_dev->model) {
+		cerr << "Error: device " << hex << tgt_dev->idcode
+			<< " not supported" << endl;
 		delete(jtag);
 		return EXIT_FAILURE;
 	}
 
-	string fab = fpga_list[idcode].manufacturer;
+	string fab = tgt_dev->model->manufacturer;
 
 
 	Device *fpga;
@@ -1005,7 +1006,7 @@ void displaySupported(const struct arguments &args)
 	}
 
 	if (args.list_fpga) {
-		for (auto &&vendor: fpga_vnd_list) {
+		for (auto &&vendor: fpga_list) {
 			stringstream t;
 			t << setw(12) << left << "IDCode" << setw(14) << "manufacturer";
 			t << setw(16) << "family" << setw(20) << "model";

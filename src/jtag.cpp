@@ -167,7 +167,6 @@ int Jtag::detectChain(int max_dev)
 
 	/* cleanup */
 	_f_device_list.clear();
-	_irlength_list.clear();
 
 	go_test_logic_reset();
 	set_state(SHIFT_DR);
@@ -233,15 +232,15 @@ bool Jtag::search_and_insert_device_with_idcode(uint32_t idcode)
 	}
 
 	/* search entry at vendor level */
-	vnd_list = fpga_vnd_list.find(manufacturer);
-	if (vnd_list != fpga_vnd_list.end()) {
+	vnd_list = fpga_list.find(manufacturer);
+	if (vnd_list != fpga_list.end()) {
 		/* try to find direct idcode (no mask) */
 		fpga2 = vnd_list->second.find(idcode);
 		/* direct not found -> search for idcode with mask */
-		if (fpga2 == fpga_vnd_list[manufacturer].end()) {
+		if (fpga2 == fpga_list[manufacturer].end()) {
 			idcode = idcode & 0x0FFFFFFF;
 			fpga2 = vnd_list->second.find(idcode);
-			if (fpga2 != fpga_vnd_list[manufacturer].end())
+			if (fpga2 != fpga_list[manufacturer].end())
 				found = true;
 		} else {
 			found = true;
@@ -269,18 +268,16 @@ bool Jtag::insert_first(uint32_t device_id, bool is_misc, uint16_t irlength, dev
 {
 	found_device dev = {device_id, irlength, is_misc, device};
 	_f_device_list.insert(_f_device_list.begin(), dev);
-	//_devices_list.insert(_devices_list.begin(), device_id);
-	_irlength_list.insert(_irlength_list.begin(), irlength);
 
 	return true;
 }
 
-uint16_t Jtag::device_select(uint16_t index)
+bool Jtag::device_select(uint16_t index)
 {
 	if (index > (uint16_t) _f_device_list.size())
-		return -1;
+		return false;
 	device_index = index;
-	return device_index;
+	return true;
 }
 
 void Jtag::setTMS(unsigned char tms)
@@ -418,7 +415,7 @@ int Jtag::shiftIR(unsigned char *tdi, unsigned char *tdo, int irlen, int end_sta
 		 * send to complete send ir sequence
 		 */
 		for (int i = 0; i < device_index; i++)
-			bypass_after += _irlength_list[i];
+			bypass_after += _f_device_list[i].irlength;
 	}
 
 	/* if not in SHIFT IR move to this state */
@@ -433,7 +430,7 @@ int Jtag::shiftIR(unsigned char *tdi, unsigned char *tdo, int irlen, int end_sta
 		 */
 		int bypass_before = 0;
 		for (unsigned int i = device_index + 1; i < _f_device_list.size(); i++)
-			bypass_before += _irlength_list[i];
+			bypass_before += _f_device_list[i].irlength;
 
 		/* if > 0 send bits */
 		if (bypass_before > 0) {

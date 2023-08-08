@@ -212,6 +212,8 @@ class Xilinx: public Device, SPIInterface {
 		std::string _secondary_file_extension; /* file type for the secondary flash file */
 		int _flash_chips; /* bitfield to select the target in boards with two flash chips */
 		std::string _user_instruction; /* which USER bscan instruction to interface with SPI */
+		std::string _model; /* device model */
+		std::string _family; /* device family */
 };
 
 #endif
