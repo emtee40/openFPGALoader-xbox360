@@ -74,6 +74,7 @@ class Lattice: public Device, SPIInterface {
 			MACHXO3D_FAMILY = 2,
 			ECP5_FAMILY = 3,
 			NEXUS_FAMILY = 4,
+			ECP3_FAMILY,
 			UNKNOWN_FAMILY = 999
 		};
 

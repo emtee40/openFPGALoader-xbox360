@@ -141,6 +141,17 @@ using namespace std;
 
 #define PUBKEY_LENGTH_BYTES				64			/* length of the public key (MachXO3D) in bytes */
 
+/* ECP3 */
+#define ECP3_LSCC_BITSTREAM_BURST 0x02
+#define ECP3_ISC_ERASE            0x03  /* ISC_ERASE */
+#define ECP3_ISC_ENABLE           0x15
+#define ECP3_IDCODE               0x16
+#define ECP3_READ_USERCODE        0x17
+#define ECP3_ISC_PROGRAM_USERCODE 0x1A
+#define ECP3_RESET_ADDRESS        0x21
+#define ECP3_LSCC_REFRESH         0x23
+#define ECP3_READ_STATUS_REGISTER 0x53
+
 Lattice::Lattice(Jtag *jtag, const string filename, const string &file_type,
 	Device::prog_type_t prg_type, std::string flash_sector, bool verify, int8_t verbose, bool skip_load_bridge, bool skip_reset):
 		Device(jtag, filename, file_type, verify, verbose),
@@ -203,6 +214,8 @@ Lattice::Lattice(Jtag *jtag, const string filename, const string &file_type,
 			printError("Unknown flash sector");
 			throw std::exception();
 		}
+	} else if (family == "ECP3") {
+		_fpga_family = ECP3_FAMILY;
 	} else if (family == "ECP5") {
 		_fpga_family = ECP5_FAMILY;
 	} else if (family == "CrosslinkNX") {
@@ -308,14 +321,21 @@ bool Lattice::program_mem()
 	 * PRELOAD/SAMPLE 0x1C
 	 * For NEXUS family fpgas, the Bscan register is 362 bits long or
 	 * 45.25 bytes => 46 bytes
+	 * For ECP3 family fpgas, the Bscan register is 1077 bits long or
+	 * 134.62 bytes => 135 bytes
 	 */
-	uint8_t tx_buf[46];
-	memset(tx_buf, 0xff, 46);
+	uint8_t tx_buf[135];
+	memset(tx_buf, 0xff, 135);
 	int tx_len;
-	if(_fpga_family == NEXUS_FAMILY){
-		tx_len = 46;
-	} else {
-		tx_len = 26;
+	switch (_fpga_family) {
+		case NEXUS_FAMILY:
+			tx_len = 46;
+			break;
+		case ECP3_FAMILY:
+			tx_len = 135;
+			break;
+		default:
+			tx_len = 26;
 	}
 	wr_rd(PRELOAD_SAMPLE, tx_buf, tx_len, NULL, 0);
 
@@ -326,32 +346,42 @@ bool Lattice::program_mem()
 	 */
 	/*flag to understand if we refreshed or not*/
 	bool was_refreshed;
-	if (_fpga_family == NEXUS_FAMILY) {
-		if (!checkStatus(0, REG_STATUS_PRV_CNF_CHK_MASK)) {
-			printInfo("Error in previous bitstream execution. REFRESH: ", false);
-			wr_rd(REFRESH, NULL, 0, NULL, 0);
-			_jtag->set_state(Jtag::RUN_TEST_IDLE);
-			_jtag->toggleClk(1000);
-			/* In Lattice FPGA-TN-02099 document in a note it's reported that there
-				 is a delay time after LSC_REFRESH where "Duration could be in
-				 seconds". Without whis waiting time, busy flag can't be cleared.*/
-			sleep(5);
-			was_refreshed = true;
+	const uint32_t clk_period = 1e9/static_cast<float>(_jtag->getClkFreq());
+	switch (_fpga_family) {
+		case NEXUS_FAMILY:
 			if (!checkStatus(0, REG_STATUS_PRV_CNF_CHK_MASK)) {
-				printError("FAIL");
-				displayReadReg(readStatusReg());
-				return false;
+				printInfo("Error in previous bitstream execution. REFRESH: ", false);
+				wr_rd(REFRESH, NULL, 0, NULL, 0);
+				_jtag->set_state(Jtag::RUN_TEST_IDLE);
+				_jtag->toggleClk(1000);
+				/* In Lattice FPGA-TN-02099 document in a note it's reported that there
+					 is a delay time after LSC_REFRESH where "Duration could be in
+					 seconds". Without whis waiting time, busy flag can't be cleared.*/
+				sleep(5);
+				was_refreshed = true;
+				if (!checkStatus(0, REG_STATUS_PRV_CNF_CHK_MASK)) {
+					printError("FAIL");
+					displayReadReg(readStatusReg());
+					return false;
+				} else {
+					printSuccess("DONE");
+				}
 			} else {
-				printSuccess("DONE");
+				was_refreshed = false;
+				if (_verbose){
+					printInfo("No error in previous bitstream execution.", true);
+				}
 			}
-		} else {
+			break;
+		case ECP3_FAMILY:
+			wr_rd(ECP3_LSCC_REFRESH, NULL, 0, NULL, 0);
+			_jtag->set_state(Jtag::RUN_TEST_IDLE);
+			_jtag->toggleClk(5e8 / clk_period); // 0.5s
+			displayReadReg(readStatusReg());
 			was_refreshed = false;
-			if (_verbose){
-				printInfo("No error in previous bitstream execution.", true);
-			}
-		}
-	} else {
-		was_refreshed = false;
+			break;
+		default:
+			was_refreshed = false;
 	}
 
 	/* ISC Enable 0xC6 */
@@ -387,6 +417,31 @@ bool Lattice::program_mem()
 		printSuccess("DONE");
 	}
 
+	if (_fpga_family == ECP3_FAMILY) {
+		// ! Erase the device
+
+		// ! Shift in ISC PROGRAM USERCODE(0x1A) instruction
+		// SIR 8   TDI  (1A);
+		// SDR 32  TDI  (FFFFFFFF);
+		// RUNTEST IDLE    5 TCK   2,00E-03 SEC;
+		// ! Shift in READ USERCODE(0x17) instruction
+		// SIR 8   TDI  (17);
+		// SDR 32  TDI  (FFFFFFFF)
+		//         TDO  (FFFFFFFF);
+		uint32_t dummy = 0xffffffff;
+		wr_rd(ECP3_ISC_PROGRAM_USERCODE, (uint8_t *)&dummy, 4, NULL, 0);
+		_jtag->set_state(Jtag::RUN_TEST_IDLE);
+		_jtag->toggleClk(2e6 / clk_period); // 2ms
+		uint32_t rx = 0;
+		wr_rd(ECP3_READ_USERCODE, (uint8_t *)&dummy, 4, (uint8_t *)&rx, 4);
+		if (rx != 0xffffffff) {
+			char message[256];
+			snprintf(message, 256, "failed: 0x%08x instead of 0xffffffff", rx);
+			printError(message);
+			return false;
+		}
+	}
+
 	/* ISC ERASE
 	 * For Nexus family (from svf file): 1 byte to tx 0x00
 	 */
@@ -404,15 +459,35 @@ bool Lattice::program_mem()
 	}
 
 	/* LSC_INIT_ADDRESS */
-	wr_rd(0x46, NULL, 0, NULL, 0);
-	_jtag->set_state(Jtag::RUN_TEST_IDLE);
-	_jtag->toggleClk(1000);
+	if (_fpga_family == ECP3_FAMILY) {
+		wr_rd(ECP3_RESET_ADDRESS, NULL, 0, NULL, 0);
+		_jtag->set_state(Jtag::RUN_TEST_IDLE);
+		_jtag->toggleClk(2e6 / clk_period); // 2ms
+		/* read user code */
+		const uint32_t dummy = 0xffffffff;
+		uint32_t rx = 0;
+		wr_rd(ECP3_READ_USERCODE, (uint8_t *)&dummy, 4, (uint8_t *)&rx, 4);
+		if (rx != 0x00000000) {
+			char message[256];
+			snprintf(message, 256, "failed: 0x%08x instead of 0xffffffff", rx);
+			printError(message);
+			return false;
+		}
+	} else {
+		wr_rd(0x46, NULL, 0, NULL, 0);
+		_jtag->set_state(Jtag::RUN_TEST_IDLE);
+		_jtag->toggleClk(1000);
+	}
 
 	const uint8_t *data = _bit.getData();
 	int length = _bit.getLength()/8;
-	wr_rd(0x7A, NULL, 0, NULL, 0);
-	_jtag->set_state(Jtag::RUN_TEST_IDLE);
-	_jtag->toggleClk(2);
+	if (_fpga_family == ECP3_FAMILY) {
+		wr_rd(ECP3_LSCC_BITSTREAM_BURST, NULL, 0, NULL, 0);
+	} else {
+		wr_rd(0x7A, NULL, 0, NULL, 0);
+		_jtag->set_state(Jtag::RUN_TEST_IDLE);
+		_jtag->toggleClk(2);
+	}
 
 	uint8_t tmp[1024];
 	int size = 1024;
@@ -435,7 +510,29 @@ bool Lattice::program_mem()
 	}
 
 	_jtag->set_state(Jtag::RUN_TEST_IDLE);
-	_jtag->toggleClk(1000);
+	if (_fpga_family == ECP3_FAMILY) {
+		_jtag->toggleClk(200e6 / clk_period); // 200ms
+		/* Verify USERCODE */
+		uint8_t r[] = {0xff, 0xff, 0xff, 0xff};
+		uint8_t t[4];
+		wr_rd(0x17, r, 4, t, 4);
+		printf("%02x %02x %02x %02x\n", t[0], t[1], t[2], t[3]);
+		// isc disable
+		wr_rd(0x1e, NULL, 0, NULL, 0);
+		_jtag->set_state(Jtag::RUN_TEST_IDLE);
+		_jtag->toggleClk(5);
+		// bypass
+		wr_rd(0xff, NULL, 0, NULL, 0);
+		_jtag->set_state(Jtag::RUN_TEST_IDLE);
+		_jtag->toggleClk(100);
+		// Verify STATUS Register
+		uint64_t status = readStatusReg();
+		printf("status %08x %08x\n", status, status & 0x60007);
+		displayReadReg(status);
+		return true;
+	} else {
+		_jtag->toggleClk(1000);
+	}
 
 	uint32_t status_mask;
 	if (_fpga_family == MACHXO3D_FAMILY)
@@ -891,6 +988,15 @@ void Lattice::program(unsigned int offset, bool unprotect_flash)
  */
 bool Lattice::EnableISC(uint8_t flash_mode)
 {
+	if (_fpga_family == ECP3_FAMILY) {
+		const uint32_t clk_period = 1e9/static_cast<float>(_jtag->getClkFreq());
+		const uint32_t clk_len = 2e7 / clk_period;
+		wr_rd(ECP3_ISC_ENABLE, NULL, 0, NULL, 0);
+		_jtag->set_state(Jtag::RUN_TEST_IDLE);
+		_jtag->toggleClk(clk_len);
+		return true;
+	}
+
 	wr_rd(ISC_ENABLE, &flash_mode, 1, NULL, 0);
 
 	_jtag->set_state(Jtag::RUN_TEST_IDLE);
@@ -935,7 +1041,8 @@ bool Lattice::DisableCfg()
 uint32_t Lattice::idCode()
 {
 	uint8_t device_id[4];
-	wr_rd(READ_DEVICE_ID_CODE, NULL, 0, device_id, 4);
+	const uint8_t idcode = (ECP3_FAMILY) ? ECP3_IDCODE : READ_DEVICE_ID_CODE;
+	wr_rd(idcode, NULL, 0, device_id, 4);
 	return device_id[3] << 24 |
 					device_id[2] << 16 |
 					device_id[1] << 8  |
@@ -998,12 +1105,13 @@ uint64_t Lattice::readStatusReg()
 	uint64_t reg;
 	uint8_t rx[8], tx[8];
 
-	int reg_len = get_statusreg_size() / 8;
+	const int reg_len = get_statusreg_size() / 8;
+	const uint8_t regcode = (_fpga_family == ECP3_FAMILY) ? ECP3_READ_STATUS_REGISTER : READ_STATUS_REGISTER;
 
 	/* valgrind warn */
 	memset(tx, 0, 8);
 	memset(rx, 0, 8);
-	wr_rd(READ_STATUS_REGISTER, tx, reg_len, rx, reg_len);
+	wr_rd(regcode, tx, reg_len, rx, reg_len);
 	_jtag->set_state(Jtag::RUN_TEST_IDLE);
 	_jtag->toggleClk(1000);
 	reg = (uint64_t) rx[7] << 56 | (uint64_t) rx[6] << 48 | (uint64_t) rx[5] << 40 | (uint64_t) rx[4] << 32 | rx[3] << 24 | rx[2] << 16 | rx[1] << 8 | rx[0];
@@ -1240,6 +1348,13 @@ bool Lattice::flashErase(uint32_t  mask)
 			(uint8_t)((mask >> 16) & 0xff)
 		};
 		wr_rd(FLASH_ERASE, tx, 2, NULL, 0);
+	} else if (_fpga_family == ECP3_FAMILY) {
+		const uint32_t clk_period = 1e9/static_cast<float>(_jtag->getClkFreq());
+		const uint32_t clk_len = 2e7 / clk_period;
+		wr_rd(ECP3_ISC_ERASE, NULL, 0, NULL, 0);
+		_jtag->set_state(Jtag::RUN_TEST_IDLE);
+		_jtag->toggleClk(clk_len);
+		return true;
 	} else {
 		uint8_t tx[1] = {(uint8_t)(mask & 0xff)};
 		wr_rd(FLASH_ERASE, tx, 1, NULL, 0);
